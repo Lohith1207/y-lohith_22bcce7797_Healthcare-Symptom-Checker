@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: Healthcare Symptom Checker API
+  description: |
+    A healthcare symptom checker API that provides educational medical information 
+    with proper safety disclaimers and emergency triage.
+    
+    **IMPORTANT DISCLAIMER**: For educational purposes only. This is not medical advice. 
+    Consult a licensed healthcare professional.
+  version: 1.0.0
+  contact:
+    name: Healthcare Symptom Checker
+    url: https://github.com/your-org/healthcare-symptom-checker
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.healthcare-symptom-checker.com
+    description: Production server
+
+paths:
+  /api/symptom-check:
+    post:
+      summary: Analyze symptoms and provide medical guidance
+      description: |
+        Analyzes user-provided symptoms and returns probable conditions with triage recommendations.
+        Includes emergency detection for immediate safety.
+      operationId: checkSymptoms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SymptomRequest'
+            example:
+              symptoms: "I have a mild headache and feel tired"
+              age: 30
+              sex: "Female"
+              other_info: "Started yesterday morning"
+      responses:
+        '200':
+          description: Successful symptom analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SymptomResponse'
+              examples:
+                emergency:
+                  summary: Emergency Response
+                  value:
+                    triage:
+                      level: "emergency"
+                      message: "This appears to be a medical emergency. Please call emergency services (911) immediately or go to the nearest emergency room."
+                    conditions:
+                      - name: "Potential Medical Emergency"
+                        confidence: "high"
+                        rationale: "Symptoms suggest a medical emergency requiring immediate attention."
+                        typical_symptoms: ["Emergency symptoms detected"]
+                    recommended_next_steps:
+                      - urgency: "emergency"
+                        action: "Call emergency services (911) immediately or go to the nearest emergency room"
+                    disclaimer: "For educational purposes only. This is not medical advice. Consult a licensed healthcare professional."
+                    asked_clarifying_questions: []
+                non_urgent:
+                  summary: Non-Urgent Response
+                  value:
+                    triage:
+                      level: "non-urgent"
+                      message: "Symptoms suggest mild conditions that may benefit from rest and observation."
+                    conditions:
+                      - name: "Tension Headache"
+                        confidence: "medium"
+                        rationale: "Headache with fatigue are common symptoms of tension headache."
+                        typical_symptoms: ["headache", "fatigue"]
+                    recommended_next_steps:
+                      - urgency: "self-care"
+                        action: "Rest and stay hydrated"
+                      - urgency: "routine"
+                        action: "If symptoms persist, consult a healthcare provider"
+                    disclaimer: "For educational purposes only. This is not medical advice. Consult a licensed healthcare professional."
+                    asked_clarifying_questions: ["How long have you had these symptoms?"]
+        '400':
+          description: Bad Request - Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Symptoms field is required"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Internal server error"
+
+  /api/health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API server
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00Z"
+
+components:
+  schemas:
+    SymptomRequest:
+      type: object
+      required:
+        - symptoms
+      properties:
+        user_id:
+          type: string
+          description: Optional user identifier for tracking
+          example: "user_123"
+        symptoms:
+          type: string
+          description: Detailed description of symptoms
+          example: "I have a mild headache and feel tired"
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+          description: Patient age (optional)
+          example: 30
+        sex:
+          type: string
+          description: Patient sex/gender (optional)
+          example: "Female"
+        other_info:
+          type: string
+          description: Additional relevant information
+          example: "Started yesterday morning"
+
+    SymptomResponse:
+      type: object
+      required:
+        - triage
+        - conditions
+        - recommended_next_steps
+        - disclaimer
+        - asked_clarifying_questions
+      properties:
+        triage:
+          $ref: '#/components/schemas/TriageLevel'
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Condition'
+        recommended_next_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendedAction'
+        disclaimer:
+          type: string
+          description: Required medical disclaimer
+          example: "For educational purposes only. This is not medical advice. Consult a licensed healthcare professional."
+        asked_clarifying_questions:
+          type: array
+          items:
+            type: string
+          description: Questions to help clarify symptoms
+          example: ["How long have you had these symptoms?"]
+
+    TriageLevel:
+      type: object
+      required:
+        - level
+        - message
+      properties:
+        level:
+          type: string
+          enum: [emergency, urgent, non-urgent, self-care]
+          description: Triage urgency level
+        message:
+          type: string
+          description: Human-readable triage message
+
+    Condition:
+      type: object
+      required:
+        - name
+        - confidence
+        - rationale
+        - typical_symptoms
+      properties:
+        name:
+          type: string
+          description: Name of the condition
+        confidence:
+          type: string
+          enum: [high, medium, low]
+          description: Confidence level in the diagnosis
+        rationale:
+          type: string
+          description: Explanation of why this condition is suggested
+        typical_symptoms:
+          type: array
+          items:
+            type: string
+          description: List of typical symptoms for this condition
+
+    RecommendedAction:
+      type: object
+      required:
+        - urgency
+        - action
+      properties:
+        urgency:
+          type: string
+          enum: [emergency, soon, routine, self-care]
+          description: Urgency level for the action
+        action:
+          type: string
+          description: Recommended action to take
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (if required)

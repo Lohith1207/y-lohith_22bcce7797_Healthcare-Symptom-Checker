@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: healthcare-postgres
+    environment:
+      POSTGRES_DB: healthcare_symptom_checker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthcare-network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: healthcare-backend
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/healthcare_symptom_checker
+      - HASH_SALT=your_production_salt_here_change_this
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=10
+      # Add your LLM API configuration here
+      # - LLM_API_KEY=your_api_key_here
+      # - LLM_API_URL=https://api.openai.com/v1/chat/completions
+      # - LLM_MODEL=gpt-3.5-turbo
+      # - LLM_TEMPERATURE=0.2
+      # - LLM_MAX_TOKENS=1000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - healthcare-network
+
+  # Frontend Web App
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: healthcare-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - healthcare-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  healthcare-network:
+    driver: bridge
